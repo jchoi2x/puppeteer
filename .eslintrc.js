@@ -265,6 +265,7 @@ module.exports = {
         {
           files: [
             'packages/puppeteer-core/src/**/*.test.ts',
+            'packages/puppeteer-extra/src/**/*.test.ts',
             'tools/mocha-runner/src/test.ts',
           ],
           rules: {
