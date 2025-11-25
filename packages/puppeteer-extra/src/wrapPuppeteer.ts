@@ -86,8 +86,14 @@ class WrappedPuppeteer implements PuppeteerWorkersWithUse {
   /**
    * Establish a devtools connection to an existing session.
    *
+   * @remarks
+   * This method supports two calling patterns:
+   *
+   * 1. With BrowserWorker endpoint and sessionId for Cloudflare Workers
+   * 2. With ConnectOptions for standard Puppeteer connections
+   *
    * @param endpoint - Cloudflare worker binding or connect options
-   * @param sessionId - Session ID obtained from a .sessions() call
+   * @param sessionId - Session ID obtained from a .sessions() call (optional)
    * @returns A browser instance
    */
   connect(
