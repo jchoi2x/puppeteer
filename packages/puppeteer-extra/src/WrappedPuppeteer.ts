@@ -199,7 +199,9 @@ export class WrappedPuppeteer implements PuppeteerWorkersWithUse {
         // Try to dynamically import and instantiate the stated dependency
         // Using dynamic import() instead of require() for Workers compatibility
         const {default: mod} = await import(packageName!);
-        dep = typeof mod === 'function' ? mod() : mod;
+        // Call the module as a function to instantiate the plugin
+        // (same as original: require(name)())
+        dep = mod();
 
         // Register it with puppeteer-extra as plugin
         if (dep) {
@@ -213,7 +215,7 @@ export class WrappedPuppeteer implements PuppeteerWorkersWithUse {
           npm install ${packageName}
 
           Note: You don't need to require the plugin yourself,
-          unless you want to modify it's default settings.
+          unless you want to modify its default settings.
           `);
         throw err;
       }
