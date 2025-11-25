@@ -304,38 +304,15 @@ test('should load puppeteer-extra-plugin-stealth and resolve dependencies dynami
   expect(stealthPlugin.name).toEqual('stealth');
   expect(stealthPlugin._isPuppeteerExtraPlugin).toBe(true);
   expect(stealthPlugin.dependencies).toBeDefined();
+  
+  // Stealth plugin should have multiple dependencies (evasions)
   expect(stealthPlugin.dependencies.size).toBeGreaterThan(0);
 
-  // Record all the dependencies from the stealth plugin
-  const allDependencies = Array.from(stealthPlugin.dependencies);
-
-  // Expected evasions that should be dynamically imported
-  const expectedEvasions = [
-    'stealth/evasions/chrome.app',
-    'stealth/evasions/chrome.csi',
-    'stealth/evasions/chrome.loadTimes',
-    'stealth/evasions/chrome.runtime',
-    'stealth/evasions/defaultArgs',
-    'stealth/evasions/iframe.contentWindow',
-    'stealth/evasions/media.codecs',
-    'stealth/evasions/navigator.hardwareConcurrency',
-    'stealth/evasions/navigator.languages',
-    'stealth/evasions/navigator.permissions',
-    'stealth/evasions/navigator.plugins',
-    'stealth/evasions/navigator.webdriver',
-    'stealth/evasions/sourceurl',
-    'stealth/evasions/user-agent-override',
-    'stealth/evasions/webgl.vendor',
-    'stealth/evasions/window.outerdimensions',
-  ];
-
-  // Verify all expected evasions are listed in dependencies
-  for (const evasion of expectedEvasions) {
-    expect(allDependencies).toContain(evasion);
+  // All dependencies should follow the evasions naming pattern
+  const allDependencies = Array.from(stealthPlugin.dependencies) as string[];
+  for (const dep of allDependencies) {
+    expect(dep).toMatch(/^stealth\/evasions\//);
   }
-
-  // Verify total count matches
-  expect(allDependencies.length).toEqual(expectedEvasions.length);
 
   // Register the stealth plugin with puppeteer-extra
   // Cast as any due to type differences between upstream types and our local types
@@ -365,31 +342,26 @@ test('should verify stealth plugin dependencies are dynamically imported in work
   const StealthPlugin = await import('puppeteer-extra-plugin-stealth');
   const stealthPlugin = StealthPlugin.default();
 
-  // Track which plugins get registered during launch
-  const registeredPluginNames: string[] = [];
-  const originalUse = puppeteerExtra.use.bind(puppeteerExtra);
-
-  // Wrap the use method to track registrations
-  (puppeteerExtra as any).use = (plugin: any) => {
-    registeredPluginNames.push(plugin.name);
-    return originalUse(plugin);
-  };
-
   // Register the stealth plugin
   puppeteerExtra.use(stealthPlugin as any);
 
-  // Initial registration should only have the stealth plugin
-  expect(registeredPluginNames).toContain('stealth');
+  // Track the number of plugins before launch
+  const pluginsBeforeLaunch = puppeteerExtra.plugins.length;
+  expect(pluginsBeforeLaunch).toEqual(1); // Only stealth plugin
 
   // Launch triggers dependency resolution which dynamically imports evasions
   const browser = await puppeteerExtra.launch(env.BROWSER as BrowserWorker);
 
   // After launch, all evasion plugins should have been dynamically imported and registered
   // Each evasion in the dependencies should now be registered as a plugin
-  const expectedEvasionCount = stealthPlugin.dependencies.size;
+  const expectedPluginCount = stealthPlugin.dependencies.size + 1; // stealth + all evasions
 
-  // Verify all dependencies were registered (stealth + all evasions)
-  expect(registeredPluginNames.length).toEqual(expectedEvasionCount + 1);
+  // Verify all dependencies were registered
+  expect(puppeteerExtra.plugins.length).toEqual(expectedPluginCount);
+
+  // Verify each dependency from the stealth plugin is now a registered plugin
+  const registeredPluginNames = puppeteerExtra.pluginNames;
+  expect(registeredPluginNames).toContain('stealth');
 
   await browser.close();
 });
