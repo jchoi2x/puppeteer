@@ -19,8 +19,9 @@ import type {
 } from './index.js';
 
 /**
- * Mock PuppeteerExtraPlugin class that mirrors the puppeteer-extra-plugin interface
- * from https://github.com/berstend/puppeteer-extra/blob/master/packages/puppeteer-extra-plugin/src/index.ts
+ * Mock PuppeteerExtraPlugin class that mirrors the puppeteer-extra-plugin interface.
+ *
+ * @see https://github.com/berstend/puppeteer-extra/tree/master/packages/puppeteer-extra-plugin
  *
  * This class tests that all plugin lifecycle methods are properly invoked.
  */
