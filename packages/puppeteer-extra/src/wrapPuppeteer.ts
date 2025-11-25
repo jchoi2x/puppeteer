@@ -8,7 +8,7 @@ import type {PuppeteerWorkers} from '@cloudflare/puppeteer';
 
 import {WrappedPuppeteer} from './WrappedPuppeteer.js';
 
-import type {PuppeteerExtraPlugin} from './index.js';
+import type {PluginData, PuppeteerExtraPlugin} from './index.js';
 
 /**
  * Extended PuppeteerWorkers interface with plugin support.
@@ -17,12 +17,30 @@ import type {PuppeteerExtraPlugin} from './index.js';
  */
 export interface PuppeteerWorkersWithUse extends PuppeteerWorkers {
   /**
+   * Get a list of all registered plugins.
+   */
+  readonly plugins: PuppeteerExtraPlugin[];
+
+  /**
+   * Get the names of all registered plugins.
+   */
+  readonly pluginNames: string[];
+
+  /**
    * Register a plugin to extend Puppeteer functionality.
    *
    * @param plugin - The plugin to register
    * @returns The PuppeteerWorkersWithUse instance for chaining
    */
   use(plugin: PuppeteerExtraPlugin): this;
+
+  /**
+   * Get data exposed by registered plugins.
+   *
+   * @param name - Optional filter by plugin name
+   * @returns Array of plugin data
+   */
+  getPluginData(name?: string): PluginData[];
 }
 
 /**
