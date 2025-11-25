@@ -149,6 +149,85 @@ export class WrappedPuppeteer implements PuppeteerWorkersWithUse {
   }
 
   /**
+   * Resolve plugin dependencies by checking if any plugins have declared
+   * dependencies on other plugins that haven't been registered yet.
+   *
+   * @remarks
+   * This method checks all registered plugins for missing dependencies using
+   * their `_getMissingDependencies` method. If missing plugins are found,
+   * it attempts to dynamically import and register them.
+   *
+   * Unlike the original puppeteer-extra which uses `require()`, this
+   * implementation uses dynamic `import()` for Cloudflare Workers compatibility.
+   *
+   * @throws Error if a required dependency cannot be loaded
+   */
+  async #resolvePluginDependencies(): Promise<void> {
+    // Request missing dependencies from all plugins and flatten to a single Set
+    const missingPlugins = this.#plugins
+      .map(p => {
+        return p._getMissingDependencies
+          ? p._getMissingDependencies(this.#plugins)
+          : new Set<string>();
+      })
+      .reduce((combined, list) => {
+        return new Set([...combined, ...list]);
+      }, new Set<string>());
+
+    if (!missingPlugins.size) {
+      return;
+    }
+
+    // Loop through all dependencies declared missing by plugins
+    for (let name of [...missingPlugins]) {
+      // Check if the dependency hasn't been registered as plugin already.
+      // This might happen when multiple plugins have nested dependencies.
+      if (this.pluginNames.includes(name)) {
+        continue;
+      }
+
+      // We follow a plugin naming convention
+      name = name.startsWith('puppeteer-extra-plugin')
+        ? name
+        : `puppeteer-extra-plugin-${name}`;
+
+      // In case a module sub resource is requested print out the main package name
+      const packageName = name.split('/')[0];
+
+      let dep: PuppeteerExtraPlugin | null = null;
+      try {
+        // Try to dynamically import and instantiate the stated dependency
+        // Using dynamic import() instead of require() for Workers compatibility
+        const {default: mod} = await import(packageName!);
+        // Call the module as a function to instantiate the plugin
+        // (same as original: require(name)())
+        dep = mod();
+
+        // Register it with puppeteer-extra as plugin
+        if (dep) {
+          this.use(dep);
+        }
+      } catch (err) {
+        console.warn(`
+          A plugin listed '${name}' as dependency,
+          which is currently missing. Please install it:
+
+          npm install ${packageName}
+
+          Note: You don't need to require the plugin yourself,
+          unless you want to modify its default settings.
+          `);
+        throw err;
+      }
+
+      // Handle nested dependencies
+      if (dep?.dependencies?.size) {
+        await this.#resolvePluginDependencies();
+      }
+    }
+  }
+
+  /**
    * Order plugins that have expressed a special placement requirement.
    * Plugins with 'runLast' requirement will be moved to the end.
    */
@@ -247,6 +326,7 @@ export class WrappedPuppeteer implements PuppeteerWorkersWithUse {
     endpoint: BrowserWorker,
     options?: WorkersLaunchOptions
   ): Promise<Browser> {
+    await this.#resolvePluginDependencies();
     this.#orderPlugins();
 
     // Give plugins the chance to modify the options before launch
@@ -296,6 +376,7 @@ export class WrappedPuppeteer implements PuppeteerWorkersWithUse {
     endpoint: BrowserWorker | ConnectOptions,
     sessionId?: string
   ): Promise<Browser> {
+    await this.#resolvePluginDependencies();
     this.#orderPlugins();
 
     // Give plugins the chance to modify the options before connect
@@ -360,6 +441,57 @@ export class WrappedPuppeteer implements PuppeteerWorkersWithUse {
     options?: WorkersLaunchOptions
   ): Promise<AcquireResponse> {
     return await this.#puppeteer.acquire(endpoint, options);
+  }
+
+  /**
+   * The default flags that Chromium will be launched with.
+   *
+   * @remarks
+   * This method is not supported in Cloudflare Workers environment.
+   * In Cloudflare Workers, the browser runs in Cloudflare's infrastructure
+   * and launch arguments are managed by the platform.
+   *
+   * @throws Error indicating this method is not supported in Workers
+   */
+  defaultArgs(_options?: unknown): string[] {
+    throw new Error(
+      'defaultArgs is not supported in Cloudflare Workers. ' +
+        'Browser launch arguments are managed by the Cloudflare platform.'
+    );
+  }
+
+  /**
+   * Path where Puppeteer expects to find the bundled browser.
+   *
+   * @remarks
+   * This method is not supported in Cloudflare Workers environment.
+   * In Cloudflare Workers, there is no local filesystem or browser executable.
+   * The browser runs in Cloudflare's infrastructure.
+   *
+   * @throws Error indicating this method is not supported in Workers
+   */
+  executablePath(_channel?: string): string {
+    throw new Error(
+      'executablePath is not supported in Cloudflare Workers. ' +
+        'There is no local browser executable in the Workers environment.'
+    );
+  }
+
+  /**
+   * Create a browser fetcher for downloading browsers.
+   *
+   * @remarks
+   * This method is not supported in Cloudflare Workers environment.
+   * In Cloudflare Workers, there is no local filesystem to download browsers to.
+   * The browser runs in Cloudflare's infrastructure.
+   *
+   * @throws Error indicating this method is not supported in Workers
+   */
+  createBrowserFetcher(_options?: unknown): never {
+    throw new Error(
+      'createBrowserFetcher is not supported in Cloudflare Workers. ' +
+        'There is no local filesystem to download browsers in the Workers environment.'
+    );
   }
 
   /**

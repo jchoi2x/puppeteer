@@ -165,6 +165,10 @@ ${[...testFiles, ...cloudflareTestFiles]
         'puppeteer-core/internal': '@cloudflare/puppeteer/internal',
         'puppeteer/lib/cjs/puppeteer/puppeteer.js': '@cloudflare/puppeteer',
         puppeteer: '@cloudflare/puppeteer',
+        'puppeteer-extra': path.resolve(
+          basedir,
+          '../../puppeteer-extra/lib/esm/index.js',
+        ),
 
         'fs/promises': path.resolve(basedir, '../tests/src/server/fsPromises'),
         'node:fs/promises': path.resolve(

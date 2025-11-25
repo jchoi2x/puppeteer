@@ -41,6 +41,36 @@ export interface PuppeteerWorkersWithUse extends PuppeteerWorkers {
    * @returns Array of plugin data
    */
   getPluginData(name?: string): PluginData[];
+
+  /**
+   * The default flags that Chromium will be launched with.
+   *
+   * @remarks
+   * This method is not supported in Cloudflare Workers environment.
+   *
+   * @throws Error indicating this method is not supported in Workers
+   */
+  defaultArgs(options?: unknown): string[];
+
+  /**
+   * Path where Puppeteer expects to find the bundled browser.
+   *
+   * @remarks
+   * This method is not supported in Cloudflare Workers environment.
+   *
+   * @throws Error indicating this method is not supported in Workers
+   */
+  executablePath(channel?: string): string;
+
+  /**
+   * Create a browser fetcher for downloading browsers.
+   *
+   * @remarks
+   * This method is not supported in Cloudflare Workers environment.
+   *
+   * @throws Error indicating this method is not supported in Workers
+   */
+  createBrowserFetcher(options?: unknown): never;
 }
 
 /**

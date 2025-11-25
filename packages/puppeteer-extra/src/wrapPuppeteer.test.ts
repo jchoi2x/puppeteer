@@ -327,4 +327,33 @@ describe('wrapPuppeteer', () => {
       expect(callOrder).toEqual(['plugin-2', 'plugin-1']);
     });
   });
+
+  describe('unsupported methods', () => {
+    it('should throw error for defaultArgs', () => {
+      const {mockPuppeteer} = createMockPuppeteerWorkers();
+      const wrapped = wrapPuppeteer(mockPuppeteer as any);
+
+      expect(() => {
+        wrapped.defaultArgs();
+      }).toThrow('defaultArgs is not supported in Cloudflare Workers');
+    });
+
+    it('should throw error for executablePath', () => {
+      const {mockPuppeteer} = createMockPuppeteerWorkers();
+      const wrapped = wrapPuppeteer(mockPuppeteer as any);
+
+      expect(() => {
+        wrapped.executablePath();
+      }).toThrow('executablePath is not supported in Cloudflare Workers');
+    });
+
+    it('should throw error for createBrowserFetcher', () => {
+      const {mockPuppeteer} = createMockPuppeteerWorkers();
+      const wrapped = wrapPuppeteer(mockPuppeteer as any);
+
+      expect(() => {
+        wrapped.createBrowserFetcher();
+      }).toThrow('createBrowserFetcher is not supported in Cloudflare Workers');
+    });
+  });
 });

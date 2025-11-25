@@ -7,7 +7,8 @@
   "description": "",
   "dependencies": {
     "@cloudflare/playwright": "^0.0.10",
-    "@cloudflare/puppeteer": "file:../../puppeteer-core"
+    "@cloudflare/puppeteer": "file:../../puppeteer-core",
+    "puppeteer-extra": "file:../../puppeteer-extra"
   },
   "devDependencies": {
     "@playwright/test": "^1.51.1",
