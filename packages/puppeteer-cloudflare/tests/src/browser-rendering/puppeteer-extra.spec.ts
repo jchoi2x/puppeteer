@@ -222,10 +222,14 @@ test('should work with connect method @smoke', async () => {
   // First acquire a session
   const {sessionId} = await puppeteerExtra.acquire(env.BROWSER as BrowserWorker);
 
+  if (!sessionId) {
+    throw new Error('Failed to acquire session: sessionId is undefined');
+  }
+
   // Then connect to it
   const browser = await puppeteerExtra.connect(
     env.BROWSER as BrowserWorker,
-    sessionId!
+    sessionId
   );
 
   expect(browserHookCalled).toBe(true);
