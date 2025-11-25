@@ -39,4 +39,5 @@ export interface PuppeteerExtraPlugin {
 }
 
 export {wrapPuppeteer} from './wrapPuppeteer.js';
+export {wrapPuppeteer as default} from './wrapPuppeteer.js';
 export type {PuppeteerWorkersWithUse} from './wrapPuppeteer.js';

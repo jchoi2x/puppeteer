@@ -4,8 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {Browser} from '@cloudflare/puppeteer';
-import type {PuppeteerWorkers} from '@cloudflare/puppeteer';
+import type {
+  ActiveSession,
+  AcquireResponse,
+  Browser,
+  BrowserWorker,
+  ClosedSession,
+  ConnectOptions,
+  LimitsResponse,
+  PuppeteerWorkers,
+  WorkersLaunchOptions,
+} from '@cloudflare/puppeteer';
 
 import type {PuppeteerExtraPlugin} from './index.js';
 
@@ -22,6 +31,156 @@ export interface PuppeteerWorkersWithUse extends PuppeteerWorkers {
    * @returns The PuppeteerWorkersWithUse instance for chaining
    */
   use(plugin: PuppeteerExtraPlugin): this;
+}
+
+/**
+ * Wrapped PuppeteerWorkers class with plugin support.
+ *
+ * @remarks
+ * This class wraps a PuppeteerWorkers instance and adds plugin support
+ * through the `use()` method. Plugins can hook into browser and page
+ * lifecycle events.
+ *
+ * @public
+ */
+class WrappedPuppeteer implements PuppeteerWorkersWithUse {
+  readonly #puppeteer: PuppeteerWorkers;
+  readonly #plugins: PuppeteerExtraPlugin[] = [];
+
+  /**
+   * @internal
+   */
+  constructor(puppeteer: PuppeteerWorkers) {
+    this.#puppeteer = puppeteer;
+  }
+
+  /**
+   * Register a plugin to extend Puppeteer functionality.
+   *
+   * @param plugin - The plugin to register
+   * @returns The WrappedPuppeteer instance for chaining
+   */
+  use(plugin: PuppeteerExtraPlugin): this {
+    this.#plugins.push(plugin);
+    if (plugin.onPluginRegistered) {
+      plugin.onPluginRegistered();
+    }
+    return this;
+  }
+
+  /**
+   * Launch a browser session.
+   *
+   * @param endpoint - Cloudflare worker binding
+   * @param options - Launch options
+   * @returns A browser session or throws
+   */
+  async launch(
+    endpoint: BrowserWorker,
+    options?: WorkersLaunchOptions
+  ): Promise<Browser> {
+    const browser = await this.#puppeteer.launch(endpoint, options);
+    return await this.#wrapBrowser(browser);
+  }
+
+  /**
+   * Establish a devtools connection to an existing session.
+   *
+   * @param endpoint - Cloudflare worker binding or connect options
+   * @param sessionId - Session ID obtained from a .sessions() call
+   * @returns A browser instance
+   */
+  connect(
+    endpoint: BrowserWorker | ConnectOptions,
+    sessionId?: string
+  ): Promise<Browser>;
+  async connect(
+    endpoint: BrowserWorker | ConnectOptions,
+    sessionId?: string
+  ): Promise<Browser> {
+    const browser = await this.#puppeteer.connect(endpoint, sessionId);
+    return await this.#wrapBrowser(browser);
+  }
+
+  /**
+   * Returns active sessions.
+   *
+   * @param endpoint - Cloudflare worker binding
+   * @returns List of active sessions
+   */
+  async sessions(endpoint: BrowserWorker): Promise<ActiveSession[]> {
+    return await this.#puppeteer.sessions(endpoint);
+  }
+
+  /**
+   * Returns recent sessions (active and closed).
+   *
+   * @param endpoint - Cloudflare worker binding
+   * @returns List of recent sessions
+   */
+  async history(endpoint: BrowserWorker): Promise<ClosedSession[]> {
+    return await this.#puppeteer.history(endpoint);
+  }
+
+  /**
+   * Returns current limits.
+   *
+   * @param endpoint - Cloudflare worker binding
+   * @returns Current limits
+   */
+  async limits(endpoint: BrowserWorker): Promise<LimitsResponse> {
+    return await this.#puppeteer.limits(endpoint);
+  }
+
+  /**
+   * Acquire a new browser session.
+   *
+   * @param endpoint - Cloudflare worker binding
+   * @param options - Launch options
+   * @returns A new browser session
+   */
+  async acquire(
+    endpoint: BrowserWorker,
+    options?: WorkersLaunchOptions
+  ): Promise<AcquireResponse> {
+    return await this.#puppeteer.acquire(endpoint, options);
+  }
+
+  /**
+   * Wrap a browser instance to trigger plugin hooks on new pages.
+   */
+  async #wrapBrowser(browser: Browser): Promise<Browser> {
+    // Call onBrowser hooks for all plugins
+    for (const plugin of this.#plugins) {
+      if (plugin.onBrowser) {
+        await plugin.onBrowser(browser);
+      }
+    }
+
+    // Store reference to plugins for closure
+    const plugins = this.#plugins;
+
+    // Store original newPage method
+    const originalNewPage = browser.newPage.bind(browser);
+
+    // Override newPage to trigger onPageCreated hooks
+    browser.newPage = async function (
+      ...args: Parameters<typeof originalNewPage>
+    ) {
+      const page = await originalNewPage(...args);
+
+      // Call onPageCreated hooks for all plugins
+      for (const plugin of plugins) {
+        if (plugin.onPageCreated) {
+          await plugin.onPageCreated(page);
+        }
+      }
+
+      return page;
+    };
+
+    return browser;
+  }
 }
 
 /**
@@ -56,79 +215,5 @@ export interface PuppeteerWorkersWithUse extends PuppeteerWorkers {
 export function wrapPuppeteer(
   puppeteer: PuppeteerWorkers
 ): PuppeteerWorkersWithUse {
-  const plugins: PuppeteerExtraPlugin[] = [];
-
-  // Store reference to original launch method
-  const originalLaunch = puppeteer.launch.bind(puppeteer);
-
-  // Store reference to original connect method
-  const originalConnect = puppeteer.connect.bind(puppeteer);
-
-  /**
-   * Register a plugin with the wrapped puppeteer instance.
-   */
-  function use(
-    this: PuppeteerWorkersWithUse,
-    plugin: PuppeteerExtraPlugin
-  ): PuppeteerWorkersWithUse {
-    plugins.push(plugin);
-    if (plugin.onPluginRegistered) {
-      plugin.onPluginRegistered();
-    }
-    return this;
-  }
-
-  /**
-   * Wrap a browser instance to trigger plugin hooks on new pages.
-   */
-  async function wrapBrowser(browser: Browser): Promise<Browser> {
-    // Call onBrowser hooks for all plugins
-    for (const plugin of plugins) {
-      if (plugin.onBrowser) {
-        await plugin.onBrowser(browser);
-      }
-    }
-
-    // Store original newPage method
-    const originalNewPage = browser.newPage.bind(browser);
-
-    // Override newPage to trigger onPageCreated hooks
-    browser.newPage = async function (
-      ...args: Parameters<typeof originalNewPage>
-    ) {
-      const page = await originalNewPage(...args);
-
-      // Call onPageCreated hooks for all plugins
-      for (const plugin of plugins) {
-        if (plugin.onPageCreated) {
-          await plugin.onPageCreated(page);
-        }
-      }
-
-      return page;
-    };
-
-    return browser;
-  }
-
-  // Override launch method
-  (puppeteer as PuppeteerWorkersWithUse).launch = async function (
-    ...args: Parameters<typeof originalLaunch>
-  ): Promise<Browser> {
-    const browser = await originalLaunch(...args);
-    return await wrapBrowser(browser);
-  };
-
-  // Override connect method
-  (puppeteer as PuppeteerWorkersWithUse).connect = async function (
-    ...args: Parameters<typeof originalConnect>
-  ): Promise<Browser> {
-    const browser = await originalConnect(...args);
-    return await wrapBrowser(browser);
-  };
-
-  // Add the use method
-  (puppeteer as PuppeteerWorkersWithUse).use = use;
-
-  return puppeteer as PuppeteerWorkersWithUse;
+  return new WrappedPuppeteer(puppeteer);
 }
