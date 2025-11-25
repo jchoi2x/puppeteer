@@ -16,6 +16,52 @@ edge.
 
 More information in the [developer docs](https://developers.cloudflare.com/browser-rendering/).
 
+## puppeteer-extra
+
+The `puppeteer-extra` package provides a plugin system for Puppeteer in Cloudflare Workers. It wraps the standard Puppeteer instance to add support for plugins that can hook into browser and page lifecycle events.
+
+### Features
+
+- **Plugin System**: Register plugins using the `use()` method to extend Puppeteer functionality
+- **Lifecycle Hooks**: Plugins can hook into events like `onBrowser`, `onPageCreated`, `beforeLaunch`, and more
+- **Plugin Dependencies**: Plugins can declare dependencies that are dynamically imported at runtime
+- **Data Sharing**: Plugins can expose data for other plugins to consume
+- **Compatible with puppeteer-extra-plugin-stealth**: Works with the stealth plugin to help avoid bot detection
+
+### Usage
+
+```ts
+import puppeteer from '@cloudflare/puppeteer';
+import { wrapPuppeteer } from 'puppeteer-extra';
+
+// Wrap puppeteer to add plugin support
+const puppeteerExtra = wrapPuppeteer(puppeteer);
+
+// Register a plugin
+puppeteerExtra.use({
+  name: 'my-plugin',
+  onPageCreated: async (page) => {
+    console.log('New page created!');
+  }
+});
+
+// Launch browser as normal
+const browser = await puppeteerExtra.launch(env.BROWSER);
+const page = await browser.newPage();
+```
+
+### Plugin Interface
+
+Plugins can implement the following hooks:
+
+- `onPluginRegistered()` - Called when the plugin is registered
+- `beforeLaunch(options)` - Called before browser launch, can modify options
+- `beforeConnect(options)` - Called before browser connect, can modify options
+- `onBrowser(browser)` - Called when a browser is launched or connected
+- `onPageCreated(page)` - Called when a new page is created
+- `onDisconnected(browser)` - Called when the browser disconnects
+- `onClose(browser)` - Called when the browser is closed
+
 Original README follows...
 
 # Puppeteer

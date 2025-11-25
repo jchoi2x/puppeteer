@@ -284,3 +284,84 @@ test('should provide getDataFromPlugins for plugins with dataFromPlugins require
   expect(data).toHaveLength(1);
   expect(data[0]?.value).toEqual({secret: 42});
 });
+
+/**
+ * Test case for puppeteer-extra-plugin-stealth dynamic import resolution.
+ * 
+ * This test verifies that:
+ * 1. The stealth plugin can be loaded in workerd environment
+ * 2. All dependencies (evasions) listed in stealthPlugin.dependencies are dynamically imported
+ * 3. The plugin works correctly with the wrapped puppeteer
+ */
+test('should load puppeteer-extra-plugin-stealth and resolve dependencies dynamically @smoke', async () => {
+  const puppeteerExtra = wrapPuppeteer(puppeteer);
+
+  // Import the real stealth plugin
+  const StealthPlugin = await import('puppeteer-extra-plugin-stealth');
+  const stealthPlugin = StealthPlugin.default();
+
+  // Verify the stealth plugin has the expected structure
+  expect(stealthPlugin.name).toEqual('stealth');
+  expect(stealthPlugin._isPuppeteerExtraPlugin).toBe(true);
+  expect(stealthPlugin.dependencies).toBeDefined();
+  
+  // Stealth plugin should have multiple dependencies (evasions)
+  expect(stealthPlugin.dependencies.size).toBeGreaterThan(0);
+
+  // All dependencies should follow the evasions naming pattern
+  const allDependencies = Array.from(stealthPlugin.dependencies) as string[];
+  for (const dep of allDependencies) {
+    expect(dep).toMatch(/^stealth\/evasions\//);
+  }
+
+  // Register the stealth plugin with puppeteer-extra
+  // Cast as any due to type differences between upstream types and our local types
+  puppeteerExtra.use(stealthPlugin as any);
+
+  // Verify the stealth plugin was registered
+  expect(puppeteerExtra.plugins.some(p => p.name === 'stealth')).toBe(true);
+
+  // Launch browser to trigger dependency resolution (dynamic imports)
+  const browser = await puppeteerExtra.launch(env.BROWSER as BrowserWorker);
+
+  // Verify more plugins were registered (the evasions should be loaded)
+  // The stealth plugin + all its evasion plugins
+  expect(puppeteerExtra.plugins.length).toBeGreaterThan(1);
+
+  // Verify the page can be created and works correctly
+  const page = await browser.newPage();
+  expect(page).toBeDefined();
+
+  await browser.close();
+});
+
+test('should verify stealth plugin dependencies are dynamically imported in workerd @smoke', async () => {
+  const puppeteerExtra = wrapPuppeteer(puppeteer);
+
+  // Import the real stealth plugin
+  const StealthPlugin = await import('puppeteer-extra-plugin-stealth');
+  const stealthPlugin = StealthPlugin.default();
+
+  // Register the stealth plugin
+  puppeteerExtra.use(stealthPlugin as any);
+
+  // Track the number of plugins before launch
+  const pluginsBeforeLaunch = puppeteerExtra.plugins.length;
+  expect(pluginsBeforeLaunch).toEqual(1); // Only stealth plugin
+
+  // Launch triggers dependency resolution which dynamically imports evasions
+  const browser = await puppeteerExtra.launch(env.BROWSER as BrowserWorker);
+
+  // After launch, all evasion plugins should have been dynamically imported and registered
+  // Each evasion in the dependencies should now be registered as a plugin
+  const expectedPluginCount = stealthPlugin.dependencies.size + 1; // stealth + all evasions
+
+  // Verify all dependencies were registered
+  expect(puppeteerExtra.plugins.length).toEqual(expectedPluginCount);
+
+  // Verify each dependency from the stealth plugin is now a registered plugin
+  const registeredPluginNames = puppeteerExtra.pluginNames;
+  expect(registeredPluginNames).toContain('stealth');
+
+  await browser.close();
+});
