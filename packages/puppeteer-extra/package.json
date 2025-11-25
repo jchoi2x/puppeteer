@@ -1,0 +1,88 @@
+{
+  "name": "puppeteer-extra",
+  "version": "1.0.0",
+  "description": "Wrapper for Puppeteer Workers with plugin support",
+  "keywords": [
+    "puppeteer",
+    "puppeteer-extra",
+    "plugins",
+    "cloudflare",
+    "workers"
+  ],
+  "type": "commonjs",
+  "main": "./lib/cjs/index.js",
+  "types": "./lib/cjs/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/cjs/index.d.ts",
+      "import": "./lib/esm/index.js",
+      "require": "./lib/cjs/index.js"
+    },
+    "./*": {
+      "import": "./*",
+      "require": "./*"
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/puppeteer/puppeteer/tree/main/packages/puppeteer-extra"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "wireit",
+    "clean": "../../tools/clean.mjs",
+    "unit": "wireit"
+  },
+  "wireit": {
+    "build": {
+      "command": "tsc -b",
+      "clean": "if-file-deleted",
+      "dependencies": [
+        "../puppeteer-core:build",
+        "generate:package-json"
+      ],
+      "files": [
+        "src/**"
+      ],
+      "output": [
+        "lib/{cjs,esm}/**",
+        "!lib/esm/package.json"
+      ]
+    },
+    "generate:package-json": {
+      "command": "tsx ../../tools/generate_module_package_json.ts lib/esm/package.json",
+      "files": [
+        "../../tools/generate_module_package_json.ts"
+      ],
+      "output": [
+        "lib/esm/package.json"
+      ]
+    },
+    "unit": {
+      "command": "node --test --test-reporter spec lib/cjs",
+      "dependencies": [
+        "build"
+      ]
+    }
+  },
+  "files": [
+    "lib",
+    "src",
+    "!*.test.ts",
+    "!*.test.js",
+    "!*.test.d.ts",
+    "!*.test.js.map",
+    "!*.test.d.ts.map",
+    "!*.tsbuildinfo"
+  ],
+  "author": "The Chromium Authors",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@cloudflare/puppeteer": "1.0.4"
+  },
+  "devDependencies": {
+    "@types/node": "18.17.15"
+  }
+}
